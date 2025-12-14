@@ -8,14 +8,12 @@ import {
     adjustInventory,
     getWixOrderFulfillmentsBatch,
     updateWixOrderDetails,
-    createWixRefund, // Используем исправленную функцию
+    addExternalRefundTransaction, 
     addExternalPayment,
-    getWixPaymentDetails // Используем для поиска ID
 } from '../lib/wixClient.js';
 import { ensureAuth } from '../lib/sheetsClient.js'; 
 
 const WIX_STORES_APP_ID = "215238eb-22a5-4c36-9e7b-e7c08025e04e"; 
-// ... (Остальной вспомогательный код остается без изменений)
 
 const SHIPPING_TITLES = {
     BRANCH: "НП Відділення",  
@@ -111,12 +109,13 @@ function getFullName(nameObj) {
     };
 }
 
+// === ОБНОВЛЕННАЯ ФУНКЦИЯ МАППИНГА СТАТУСОВ ===
 function mapWixOrderToMurkitResponse(wixOrder, fulfillments, externalId) {
-    const orderStatus = wixOrder.fulfillmentStatus || wixOrder.status;
+    const fulfillmentStatus = wixOrder.fulfillmentStatus; // FULFILLED, NOT_FULFILLED, PARTIALLY...
+    const paymentStatus = wixOrder.paymentStatus; // PAID, NOT_PAID, REFUNDED, VOIDED...
     const wixShippingLine = wixOrder.shippingInfo?.title || ''; 
 
-    let murkitStatus = 'accepted';
-    let murkitCancelStatus = null;
+    // 1. Извлекаем данные о доставке (ТТН)
     let shipmentType = null;
     let shipment = null;
     let ttn = null;
@@ -127,28 +126,48 @@ function mapWixOrderToMurkitResponse(wixOrder, fulfillments, externalId) {
         
         if (fulfillmentWithTtn) {
             ttn = String(fulfillmentWithTtn.trackingInfo.trackingNumber).trim();
+            // Определяем тип доставки на основе названия метода доставки в Wix
             shipmentType = WIX_TO_MURKIT_STATUS_MAPPING[wixShippingLine.trim()] || 'nova-post'; 
             shipment = { ttn: ttn };
         }
     }
-    
-    if (wixOrder.status === 'CANCELED') { 
+
+    // 2. Определяем статусы для Murkit
+    let murkitStatus = 'accepted';
+    let murkitCancelStatus = null;
+
+    // СЦЕНАРИЙ: Заказ полностью отменен (вручную в Wix до отправки или через API до отправки)
+    if (wixOrder.status === 'CANCELED') {
         murkitStatus = 'canceled';
         murkitCancelStatus = 'canceled';
-    } 
-    else if (orderStatus === 'FULFILLED') {
+        // При полной отмене shipment и shipmentType должны быть null
+        shipment = null;
+        shipmentType = null;
+    }
+    // СЦЕНАРИЙ: Заказ отправлен (FULFILLED)
+    else if (fulfillmentStatus === 'FULFILLED') {
         murkitStatus = 'sent';
-    } 
+
+        // Проверяем, не был ли он возвращен/аннулирован ПОСЛЕ отправки
+        // Если статус оплаты стал REFUNDED, VOIDED или NOT_PAID - значит идет процесс отмены ("canceling")
+        if (['REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED', 'NOT_PAID'].includes(paymentStatus)) {
+            murkitCancelStatus = 'canceling';
+        } else {
+            murkitCancelStatus = null;
+        }
+    }
+    // СЦЕНАРИЙ: Заказ в процессе (оплачен/не оплачен, но не отменен и не отправлен)
     else {
         murkitStatus = 'accepted';
+        murkitCancelStatus = null;
     }
 
     return {
         id: externalId, 
         status: murkitStatus,
         cancelStatus: murkitCancelStatus,
-        shipmentType: wixOrder.status === 'CANCELED' ? null : shipmentType,
-        shipment: wixOrder.status === 'CANCELED' ? null : shipment
+        shipmentType: shipmentType,
+        shipment: shipment
     };
 }
 
@@ -173,80 +192,58 @@ export default async function handler(req, res) {
             }
             
             const isSent = currentWixOrder.fulfillmentStatus === 'FULFILLED';
-            let murkitResponse;
             let fulfillments;
 
+            // Если заказ уже в статусе CANCELED, просто возвращаем его статус
             if (currentWixOrder.status === 'CANCELED') {
                 const batchResponse = await getWixOrderFulfillmentsBatch([wixOrderId]);
                 const orderFulfillmentData = batchResponse[0];
                 fulfillments = (orderFulfillmentData && orderFulfillmentData.fulfillments) ? orderFulfillmentData.fulfillments : [];
                 
-                murkitResponse = mapWixOrderToMurkitResponse(currentWixOrder, fulfillments, wixOrderId);
-                murkitResponse.status = 'canceled';
-                murkitResponse.cancelStatus = 'canceled';
-
+                const murkitResponse = mapWixOrderToMurkitResponse(currentWixOrder, fulfillments, wixOrderId);
                 return res.status(200).json(murkitResponse);
             }
 
             if (isSent) {
-                // FULFILLED LOGIC
+                // FULFILLED LOGIC: Refund via transaction
                 try {
                     const totalAmount = currentWixOrder.priceSummary?.total?.amount || "0";
                     const currency = currentWixOrder.priceSummary?.total?.currency || "UAH";
-                    const orderLineItems = currentWixOrder.lineItems || []; // Получаем lineItems
                     let refundSuccess = false;
 
-                    // 1. Ищем ID оплаты
-                    console.log(`[DEBUG] Attempting to find payment details for order: ${wixOrderId}`);
-                    const payment = await getWixPaymentDetails(wixOrderId);
-                    
-                    if (payment && payment.id && orderLineItems.length > 0) {
-                        const paymentId = payment.id;
-                        const paymentStatus = payment.regularPaymentDetails?.status || 'UNKNOWN';
-                        console.log(`[DEBUG] Payment found: ${paymentId}. Status: ${paymentStatus}. Attempting full Refund.`);
-                        
-                        // 2. Делаем штатный Refund с полным payload
-                        const refundResult = await createWixRefund(wixOrderId, paymentId, totalAmount, currency, orderLineItems);
+                    console.log(`[DEBUG] Attempting to add REFUND transaction for order: ${wixOrderId}`);
+                    const refundResult = await addExternalRefundTransaction(wixOrderId, totalAmount, currency);
 
-                        if (refundResult) {
-                           refundSuccess = true;
-                           console.log(`Order ${wixOrderId} FULFILLED. Payment status set to REFUNDED.`);
-                           
-                           await updateWixOrderDetails(wixOrderId, {
-                                buyerNote: "⚠️ КЛІЄНТ ПОПРОСИВ ПОВЕРНЕННЯ / REFUND SUCCESS"
-                           });
-                        }
-
+                    if (refundResult) {
+                       refundSuccess = true;
+                       console.log(`Order ${wixOrderId} FULFILLED. Refund transaction added.`);
+                       await updateWixOrderDetails(wixOrderId, {
+                            buyerNote: "⚠️ КЛІЄНТ ПОПРОСИВ ПОВЕРНЕННЯ / REFUND SUCCESS (Transaction Added)"
+                       });
                     } 
                     
                     if (!refundSuccess) {
-                         // В этом блоке мы окажемся, если:
-                         // а) payment.id не найден
-                         // б) createWixRefund вернул null (ошибка API)
-                         console.warn(`[DEBUG] Payment or Refund failed for order ${wixOrderId}. Skipping refund and logging note.`);
+                         console.warn(`[DEBUG] REFUND transaction failed for order ${wixOrderId}.`);
                          await updateWixOrderDetails(wixOrderId, {
-                              buyerNote: "⚠️ REFUND REQUIRED (AUTO-REFUND FAILED: NO PAYMENT ID or API ERROR)"
+                              buyerNote: "⚠️ REFUND REQUIRED (AUTO-REFUND FAILED: Transaction API Error)"
                          });
                     }
 
                 } catch (updateError) {
-                    // Если сам процесс Refund (API вызов) выдал исключение
-                    console.error(`Wix refund logic failed for ${wixOrderId}:`, updateError.message);
+                    console.error(`Wix refund logic crashed for ${wixOrderId}:`, updateError.message);
                     await updateWixOrderDetails(wixOrderId, {
                          buyerNote: `⚠️ REFUND REQUIRED (AUTO-REFUND CRASHED: ${updateError.message})`
                     });
                 }
 
-                // Возвращаем Murkit статус 'canceling', не меняя статус заказа.
+                // После добавления транзакции статус оплаты в Wix изменится на REFUNDED (или должен).
+                // Получаем обновленный заказ, чтобы правильно сформировать ответ
+                const updatedWixOrder = await findWixOrderById(wixOrderId);
                 const batchResponse = await getWixOrderFulfillmentsBatch([wixOrderId]);
                 const orderFulfillmentData = batchResponse[0];
                 fulfillments = (orderFulfillmentData && orderFulfillmentData.fulfillments) ? orderFulfillmentData.fulfillments : [];
                 
-                const mappedResponse = mapWixOrderToMurkitResponse(currentWixOrder, fulfillments, wixOrderId);
-                
-                mappedResponse.status = 'sent';
-                mappedResponse.cancelStatus = 'canceling';
-                
+                const mappedResponse = mapWixOrderToMurkitResponse(updatedWixOrder || currentWixOrder, fulfillments, wixOrderId);
                 return res.status(200).json(mappedResponse);
                 
             } else {
@@ -266,11 +263,7 @@ export default async function handler(req, res) {
                     const orderFulfillmentData = batchResponse[0];
                     fulfillments = (orderFulfillmentData && orderFulfillmentData.fulfillments) ? orderFulfillmentData.fulfillments : [];
 
-                    murkitResponse = mapWixOrderToMurkitResponse(wixOrder, fulfillments, wixOrderId);
-                    
-                    murkitResponse.status = 'canceled';
-                    murkitResponse.cancelStatus = 'canceled';
-                    
+                    const murkitResponse = mapWixOrderToMurkitResponse(wixOrder, fulfillments, wixOrderId);
                     return res.status(200).json(murkitResponse);
                 }
             }
@@ -294,11 +287,8 @@ export default async function handler(req, res) {
             const orderFulfillmentData = batchResponse[0];
             const fulfillments = (orderFulfillmentData && orderFulfillmentData.fulfillments) ? orderFulfillmentData.fulfillments : [];
 
+            // Используем обновленную функцию маппинга
             const murkitResponse = mapWixOrderToMurkitResponse(wixOrder, fulfillments, wixOrderId);
-            if (wixOrder.status === 'CANCELED') {
-                 murkitResponse.status = 'canceled';
-                 murkitResponse.cancelStatus = 'canceled';
-            }
             return res.status(200).json(murkitResponse);
         } catch (error) {
             return res.status(500).json({ message: 'Internal server error', code: 'INTERNAL_ERROR' });
@@ -344,12 +334,8 @@ export default async function handler(req, res) {
         
         const responses = ordersToProcess.map(result => {
             const fulfillmentsForOrder = batchFulfillmentMap.get(result.id) || [];
-            const murkitResponse = mapWixOrderToMurkitResponse(result.order, fulfillmentsForOrder, result.id);
-            if (result.order.status === 'CANCELED') {
-                 murkitResponse.status = 'canceled';
-                 murkitResponse.cancelStatus = 'canceled';
-            }
-            return murkitResponse;
+            // Используем обновленную функцию маппинга
+            return mapWixOrderToMurkitResponse(result.order, fulfillmentsForOrder, result.id);
         });
         return res.status(200).json({ orders: responses, errors: errors });
     }

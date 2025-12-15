@@ -512,7 +512,7 @@ export default async function handler(req, res) {
             const customFields = [];
             if (cartNumber) {
                 customFields.push({
-                    title: "Monobank Cart ID", 
+                    title: "Monomarket Cart ID", 
                     value: cartNumber
                 });
             }

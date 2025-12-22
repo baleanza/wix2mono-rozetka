@@ -115,7 +115,7 @@ export default async function handler(req, res) {
 
 
             if (!wixOrder) {
-                return res.status(404).json({ error: 'Order not found in Wix by ID or Murkit Number.' });
+                return res.status(404).json({ error: 'Замовлення не знайдено' });
             }
 
             // Отримуємо всі три ідентифікатори. Фоллбек на 'N/A'
@@ -369,7 +369,7 @@ export default async function handler(req, res) {
                 <h2>Перевірка номера замовлення</h2>
                 <div class="order-lookup-box">
                     <strong>Wix ID / Murkit ID:</strong>
-                    <input type="text" id="wixOrderId" placeholder="Вставте Wix ID (UUID) або Зовнішній номер (Murkit ID)">
+                    <input type="text" id="wixOrderId" placeholder="Вставте Wix ID (UUID) або Зовнішній номер (Monomarket ID)">
                     <button onclick="lookupOrder()">Отримати номери</button>
                     <span id="lookupResult" class="lookup-result"></span>
                 </div>

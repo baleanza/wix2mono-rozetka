@@ -517,6 +517,13 @@ export default async function handler(req, res) {
                 });
             }
 
+            if (murkitOrderId) {
+    customFields.push({
+        title: "Monobank Order ID", 
+        value: murkitOrderId
+    });
+}
+
             const wixOrderPayload = {
                 channelInfo: { type: "WEB", externalOrderId: murkitOrderId },
                 status: "APPROVED",

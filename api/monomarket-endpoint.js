@@ -509,20 +509,25 @@ export default async function handler(req, res) {
 
             const shippingAddress = { country: "UA", city: npCity || "City", addressLine: finalAddressLine, postalCode: "00000" };
 
-            const customFields = [];
-            if (cartNumber) {
-                customFields.push({
-                    title: "Monomarket Cart ID", 
-                    value: cartNumber
-                });
+
+            
+const customFields = [];
+            
+            let combinedIdValue = "";
+            if (cartNumber && murkitOrderId) {
+                combinedIdValue = `${cartNumber} / ${murkitOrderId}`;
+            } else if (cartNumber) {
+                combinedIdValue = cartNumber;
+            } else if (murkitOrderId) {
+                combinedIdValue = murkitOrderId;
             }
 
-if (murkitOrderId) {
-    customFields.push({
-        title: "Monomarket Order ID", // Изменил Monobank -> Monomarket для единообразия
-        value: String(murkitOrderId)
-    });
-}
+            if (combinedIdValue) {
+                customFields.push({
+                    title: "Monomarket Cart / Order ID", 
+                    value: String(combinedIdValue)
+                });
+            }
 
             const wixOrderPayload = {
                 channelInfo: { type: "WEB", externalOrderId: murkitOrderId },

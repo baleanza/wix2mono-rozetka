@@ -10,6 +10,11 @@
     { "source": "/monomarket-stock", "destination": "/api/monomarket-stock.js" },
     { "source": "/monomarket-endpoint", "destination": "/api/monomarket-endpoint.js" },
     { "source": "/monomarket-endpoint/", "destination": "/api/monomarket-endpoint.js" },
-    { "source": "/monomarket-endpoint/orders/:path*", "destination": "/api/monomarket-endpoint.js" }
+    { "source": "/monomarket-endpoint/orders/:path*", "destination": "/api/monomarket-endpoint.js" },
+    
+    { "source": "/debug-fulfillment", "destination": "/api/debug-fulfillment.js" },
+    { "source": "/debug-order", "destination": "/api/debug-order.js" },
+    { "source": "/debug-payment", "destination": "/api/debug-payment.js" },
+    { "source": "/debug-wix", "destination": "/api/debug-wix.js" }
   ]
 }

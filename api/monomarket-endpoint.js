@@ -110,7 +110,7 @@ function getFullName(nameObj) {
 }
 
 // === НОВАЯ ЛОГИКА МАППИНГА (строго по ТЗ) ===
-function mapWixOrderToMurkitResponse(wixOrder, fulfillments, externalId) {
+function mapWixOrderToMurkitResponse(wixOrder, fulfillments, Id) {
     const fulfillmentStatus = wixOrder.fulfillmentStatus; 
     const paymentStatus = wixOrder.paymentStatus; 
     const wixShippingLine = wixOrder.shippingInfo?.title || ''; 
@@ -517,10 +517,10 @@ export default async function handler(req, res) {
                 });
             }
 
-            if (murkitOrderId) {
+if (murkitOrderId) {
     customFields.push({
-        title: "Monobank Order ID", 
-        value: murkitOrderId
+        title: "Monomarket Order ID", // Изменил Monobank -> Monomarket для единообразия
+        value: String(murkitOrderId)
     });
 }
 

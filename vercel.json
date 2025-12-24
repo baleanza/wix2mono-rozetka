@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/*.js", "use": "@vercel/node" }
+  ],
+  "rewrites": [
+    { "source": "/", "destination": "/api/monomarket.js" },
+    { "source": "/monomarket", "destination": "/api/monomarket.js" },
+    { "source": "/monomarket-offers", "destination": "/api/monomarket-offers.js" },
+    { "source": "/monomarket-stock", "destination": "/api/monomarket-stock.js" },
+    { "source": "/monomarket-endpoint", "destination": "/api/monomarket-endpoint.js" },
+    { "source": "/monomarket-endpoint/", "destination": "/api/monomarket-endpoint.js" },
+    { "source": "/monomarket-endpoint/orders/:path*", "destination": "/api/monomarket-endpoint.js" }
+  ]
+}

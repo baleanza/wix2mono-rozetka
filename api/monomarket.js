@@ -368,7 +368,7 @@ export default async function handler(req, res) {
                 
                 <h2>Перевірка номера замовлення</h2>
                 <div class="order-lookup-box">
-                    <strong>Wix ID / Murkit ID:</strong>
+                    <strong>Wix ID / Monomarket ID:</strong>
                     <input type="text" id="wixOrderId" placeholder="Вставте Wix ID (UUID) або Зовнішній номер (Monomarket ID)">
                     <button onclick="lookupOrder()">Отримати номери</button>
                     <span id="lookupResult" class="lookup-result"></span>

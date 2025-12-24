@@ -110,7 +110,7 @@ function getFullName(nameObj) {
 }
 
 // === НОВАЯ ЛОГИКА МАППИНГА (строго по ТЗ) ===
-function mapWixOrderToMurkitResponse(wixOrder, fulfillments, Id) {
+function mapWixOrderToMurkitResponse(wixOrder, fulfillments, externalId) {
     const fulfillmentStatus = wixOrder.fulfillmentStatus; 
     const paymentStatus = wixOrder.paymentStatus; 
     const wixShippingLine = wixOrder.shippingInfo?.title || ''; 

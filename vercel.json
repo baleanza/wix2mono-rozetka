@@ -11,11 +11,5 @@
     { "source": "/monomarket-endpoint", "destination": "/api/monomarket-endpoint.js" },
     { "source": "/monomarket-endpoint/", "destination": "/api/monomarket-endpoint.js" },
     { "source": "/monomarket-endpoint/orders/:path*", "destination": "/api/monomarket-endpoint.js" }
-  ],
-  "crons": [
-    {
-      "path": "/api/monomarket-stock?update=1",
-      "schedule": "0 3 * * *"
-    }
   ]
 }

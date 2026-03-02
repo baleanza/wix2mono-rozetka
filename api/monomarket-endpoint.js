@@ -39,6 +39,17 @@ function normalizeSku(sku) {
     return String(sku).trim();
 }
 
+// Функция для фонового обновления фида остатков
+function triggerBackgroundStockUpdate(req) {
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers.host;
+  if (host) {
+    const url = `${protocol}://${host}/api/monomarket-stock?forceUpdate=true`;
+    // Выполняем fetch без await. Это запускает процесс "в фоне".
+    fetch(url).catch(err => console.error('Failed to trigger background stock update:', err));
+  }
+}
+
 export function checkAuth(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return false;
@@ -186,6 +197,8 @@ export default async function handler(req, res) {
     if (!checkAuth(req)) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    triggerBackgroundStockUpdate(req);
     
     const urlPathFull = req.url;
     const urlPath = urlPathFull.split('?')[0]; 

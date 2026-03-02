@@ -15,7 +15,7 @@
   "crons": [
     {
       "path": "/api/monomarket-stock?update=1",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

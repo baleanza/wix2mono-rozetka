@@ -210,11 +210,8 @@ triggerBackgroundStockUpdate(req);
       try {
         const xml = await readDriveFileContent(drive, fileMeta.id);
 
-        res.setHeader('Content-Type', "application/xml; charset=utf-8");
-        res.setHeader(
-          'Cache-Control',
-          `public, s-maxage=${CACHE_TTL_SECONDS}, max-age=0`
-        );
+        ('Content-Type', "application/xml; charset=utf-8");
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.status(200).send(xml);
         return; 
       } catch (e) {
@@ -249,10 +246,7 @@ triggerBackgroundStockUpdate(req);
 
     // Отправляем сгенерированный файл
     res.setHeader('Content-Type', "application/xml; charset=utf-8");
-    res.setHeader(
-      'Cache-Control',
-      `public, s-maxage=${CACHE_TTL_SECONDS}, max-age=0`
-    );
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.status(200).send(xml);
   } catch (err) {
     console.error('Error in /api/monomarket-offers', err);

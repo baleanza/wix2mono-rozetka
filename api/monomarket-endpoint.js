@@ -1,14 +1,3 @@
-function triggerCacheUpdate(req) {
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers.host;
-    const updateUrl = `${protocol}://${host}/api/monomarket-stock?update=1`;
-    
-    fetch(updateUrl).catch(err => {
-        console.error('Background stock update triggered (non-blocking)');
-    });
-}
-
-
 import { 
     createWixOrder, 
     getProductsBySkus, 
@@ -306,8 +295,6 @@ export default async function handler(req, res) {
             const orderFulfillmentData = batchResponse[0];
             const fulfillments = (orderFulfillmentData && orderFulfillmentData.fulfillments) ? orderFulfillmentData.fulfillments : [];
 
-            triggerCacheUpdate(req);
-            
             return res.status(200).json(mapWixOrderToMurkitResponse(wixOrder, fulfillments, wixOrderId));
         } catch (error) {
             return res.status(500).json({ message: 'Internal server error', code: 'INTERNAL_ERROR' });
@@ -371,7 +358,6 @@ export default async function handler(req, res) {
 
             const existingOrder = await findWixOrderByExternalId(murkitOrderId);
             if (existingOrder) {
-                triggerCacheUpdate(req);
                 return res.status(200).json({ "id": existingOrder.id }); 
             }
 

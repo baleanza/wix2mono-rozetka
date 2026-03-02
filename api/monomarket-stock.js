@@ -6,7 +6,7 @@ import { requireEnv, cleanPrice, getSheetsClient } from '../lib/sheetsClient.js'
 import { getDriveClient } from '../lib/driveClient.js';
 
 
-const CACHE_TTL_SECONDS = 300;
+const CACHE_TTL_SECONDS = 30;
 
 const DRIVE_FILE_NAME = 'monomarket-stock.json';
 const SHARED_DRIVE_FOLDER_ID = process.env.SHARED_DRIVE_FOLDER_ID || null;

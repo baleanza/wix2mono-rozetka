@@ -13,6 +13,10 @@ import {
 } from '../lib/wixClient.js';
 import { ensureAuth } from '../lib/sheetsClient.js'; 
 
+// Переменная для хранения времени последнего GET-обновления в памяти инстанса
+let lastGetStockUpdate = 0;
+const GET_UPDATE_COOLDOWN_MS = 10 * 60 * 1000; // 10 минут в миллисекундах
+
 const WIX_STORES_APP_ID = "215238eb-22a5-4c36-9e7b-e7c08025e04e"; 
 
 const SHIPPING_TITLES = {
@@ -198,7 +202,21 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    triggerBackgroundStockUpdate(req);
+    // --- Умный запуск фонового обновления остатков ---
+    if (req.method === 'POST') {
+        // При POST-запросах (например, создание заказа) обновляем всегда
+        triggerBackgroundStockUpdate(req);
+    } else if (req.method === 'GET') {
+        // При GET-запросах обновляем не чаще раза в 10 минут
+        const now = Date.now();
+        if (now - lastGetStockUpdate > GET_UPDATE_COOLDOWN_MS) {
+            lastGetStockUpdate = now;
+            triggerBackgroundStockUpdate(req);
+        }
+    } else {
+        // На всякий случай для других методов (PUT, DELETE)
+        triggerBackgroundStockUpdate(req);
+    }
     
     const urlPathFull = req.url;
     const urlPath = urlPathFull.split('?')[0]; 
@@ -240,7 +258,7 @@ export default async function handler(req, res) {
                        refundSuccess = true;
                        console.log(`Order ${wixOrderId} Refunded via AddPayment.`);
                        await updateWixOrderDetails(wixOrderId, {
-                            buyerNote: "⚠️ КЛІЄНТ ПОПРОСИВ ПОВЕРНЕННЯ / REFUND SUCCESS (Transaction Added)"
+                           buyerNote: "⚠️ КЛІЄНТ ПОПРОСИВ ПОВЕРНЕННЯ / REFUND SUCCESS (Transaction Added)"
                        });
                     } 
                     

@@ -9,6 +9,17 @@ const CACHE_TTL_SECONDS = parseInt(process.env.CACHE_TTL_SECONDS || '7200', 10);
 const DRIVE_FILE_NAME = 'monomarket-offers.xml';
 const SHARED_DRIVE_FOLDER_ID = process.env.SHARED_DRIVE_FOLDER_ID || null;
 
+// Функция для фонового обновления фида остатков
+function triggerBackgroundStockUpdate(req) {
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers.host;
+  if (host) {
+    const url = `${protocol}://${host}/api/monomarket-stock?forceUpdate=true`;
+    // Выполняем fetch без await. Это запускает процесс "в фоне".
+    fetch(url).catch(err => console.error('Failed to trigger background stock update:', err));
+  }
+}
+
 function requireEnv(varName) {
   const value = process.env[varName];
   if (!value) {

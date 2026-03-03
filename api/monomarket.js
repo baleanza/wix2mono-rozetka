@@ -152,8 +152,17 @@ export default async function handler(req, res) {
             return res.send('<h1>Таблиця пуста</h1>');
         }
 
+        // --- PAGINATION LOGIC ---
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 100;
+        const totalRows = importValues.length - 1;
+        const totalPages = Math.ceil(totalRows / limit);
+        const startIndex = (page - 1) * limit + 1;
+        const endIndex = startIndex + limit;
+        
         const headers = importValues[0];
-        const dataRows = importValues.slice(1);
+        const dataRows = importValues.slice(startIndex, endIndex); // Берем только нужный кусок
+        // --- END PAGINATION LOGIC ---
         
         // Parse feed settings
         const controlHeaders = controlValues[0] || [];
@@ -318,6 +327,29 @@ export default async function handler(req, res) {
                     .res-success { color: #0070f3; }
                     .res-error { color: #d93025; }
 
+                    /* Pagination styles */
+                    .pagination-box {
+                        margin: 20px 0;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: #f9f9f9;
+                        padding: 10px;
+                        border-radius: 4px;
+                    }
+                    .pagination-links a {
+                        padding: 5px 10px;
+                        text-decoration: none;
+                        border: 1px solid #ddd;
+                        color: #333;
+                        margin-right: 5px;
+                    }
+                    .pagination-links a.active {
+                        background: #0070f3;
+                        color: white;
+                        border-color: #0070f3;
+                    }
+
                     /* Table styles */
                     table { border-collapse: collapse; width: 100%; margin-top: 15px; }
                     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -424,13 +456,41 @@ export default async function handler(req, res) {
                             resultSpan.className = "lookup-result res-error";
                         }
                     }
+
+                    function changeLimit(limit) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('limit', limit);
+                        url.searchParams.set('page', 1);
+                        window.location.href = url.toString();
+                    }
                 </script>
 
                 <h2>Monomarket Feed Table</h2>
                 
                 <div class="summary">
-                    Усього товарів у таблиці: ${tableData.length} <br>
-                    Зібрано залишків з Wix: ${inventory.length}
+                    Усього товарів у таблиці: ${totalRows} <br>
+                    Сторінка: ${page} з ${totalPages}
+                </div>
+
+                <div class="pagination-box">
+                    <div class="pagination-links">
+                        ${Array.from({length: totalPages}, (_, i) => i + 1)
+                            .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                            .map((p, i, arr) => {
+                                let html = '';
+                                if (i > 0 && p - arr[i-1] > 1) html += '<span>...</span>';
+                                html += '<a href="?page=' + p + '&limit=' + limit + '" class="' + (p === page ? 'active' : '') + '">' + p + '</a>';
+                                return html;
+                            }).join('')}
+                    </div>
+                    <div class="pagination-settings">
+                        Показувати по: 
+                        <select onchange="changeLimit(this.value)">
+                            <option value="25" ${limit === 25 ? 'selected' : ''}>25</option>
+                            <option value="50" ${limit === 50 ? 'selected' : ''}>50</option>
+                            <option value="100" ${limit === 100 ? 'selected' : ''}>100</option>
+                        </select>
+                    </div>
                 </div>
 
                 <table>

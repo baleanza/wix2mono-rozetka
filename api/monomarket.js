@@ -63,8 +63,8 @@ async function readSheetData(sheets, spreadsheetId) {
 }
 
 export default async function handler(req, res) {
-    const AUTH_USER = process.env.MONOMARKET_USER;
-    const AUTH_PASS = process.env.MONOMARKET_PASSWORD;
+    const AUTH_USER = process.env.BALEANZA_USER;
+    const AUTH_PASS = process.env.BALEANZA_PASSWORD;
     
     // --- TEMPORARILY REPLICATE BASIC AUTH CHECK ---
     let authPassed = true;
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
             }
         }
         if (!authPassed) {
-             res.setHeader('WWW-Authenticate', 'Basic realm="Monomarket Private Area"');
+             res.setHeader('WWW-Authenticate', 'Basic realm="Baleanza Private Area"');
              return res.status(401).send('Unauthorized');
         }
     }
